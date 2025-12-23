@@ -3,371 +3,640 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>霾都狂徒 - 调查员档案管理</title>
+    <title>霾都狂徒 - 废土档案库</title>
     <style>
         :root {
-            --copper: #b87333;
-            --brass: #d4af37;
-            --iron: #3d3d3d;
-            --parchment: #f4e4bc;
-            --dark-paper: #1a1510;
-            --danger: #7c2222;
-            --success: #2a4d50;
+            /* 霾都狂徒风格色板 */
+            --pf-深红: #8b3a3a; /* 铁锈红 */
+            --pf-古金: #cd7f32; /* 脏黄铜/青铜 */
+            --pf-纸张: #e0d8c8; /* 泛黄的工业纸张 */
+            --pf-边框: #2f2f2f; /* 枪械黑铁 */
+            --pf-文本: #1a1a1a; /* 煤烟黑 */
+            --pf-警告红: #ff4500; /* 熔炉火光橙 */
+            --pf-高亮: #daa520;
+        }
+
+        /* === 动画定义 === */
+        @keyframes 纸张展开 {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes 呼吸光 {
+            0% { box-shadow: 0 0 50px rgba(0,0,0,0.9); }
+            50% { box-shadow: 0 0 70px rgba(205, 127, 50, 0.15); } /* 黄铜色呼吸 */
+            100% { box-shadow: 0 0 50px rgba(0,0,0,0.9); }
+        }
+
+        @keyframes 弹窗进入 {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* 紧急未保存动画 - 蒸汽压力过大 */
+        @keyframes 紧急呼吸 {
+            0% { transform: scale(1); box-shadow: 0 0 5px var(--pf-警告红); border-color: var(--pf-警告红); }
+            50% { transform: scale(1.02); box-shadow: 0 0 20px var(--pf-警告红), inset 0 0 10px #ffcc00; }
+            100% { transform: scale(1); box-shadow: 0 0 5px var(--pf-警告红); border-color: var(--pf-警告红); }
+        }
+
+        @keyframes 背景暗流 {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* 火花飞溅动画 */
+        @keyframes 尘埃漂浮 {
+            0% { transform: translateY(100vh) translateX(0) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            80% { opacity: 0.8; }
+            100% { transform: translateY(-10vh) translateX(40px) rotate(45deg); opacity: 0; }
         }
 
         body {
-            background-color: #0b0b0b;
+            background-color: #0a0a0a;
+            /* 烟雾与油污质感 */
             background-image: 
-                radial-gradient(circle at 50% 50%, rgba(44, 30, 20, 0.8) 0%, #0b0b0b 100%),
-                url("https://www.transparenttextures.com/patterns/carbon-fibre.png");
-            color: var(--parchment);
-            font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
-            margin: 0; padding: 20px;
+                url('https://www.transparenttextures.com/patterns/black-scales.png'),
+                radial-gradient(circle at 50% 50%, rgba(50, 30, 20, 0.4), rgba(0, 0, 0, 0.95));
+            background-attachment: fixed, fixed;
+            background-size: auto, 200% 200%;
+            animation: 背景暗流 20s ease infinite;
+            color: var(--pf-文本);
+            font-family: "Source Han Serif SC", "Songti SC", "Courier New", serif; /* 增加等宽字体感 */
+            margin: 0; padding: 30px 10px;
             display: flex; flex-direction: column; align-items: center;
-        }
-
-        .container {
-            width: 95%; max-width: 1200px;
-            border: 6px double var(--copper);
-            background: var(--dark-paper);
-            padding: 30px;
-            box-shadow: 0 0 50px rgba(0,0,0,1), inset 0 0 100px rgba(0,0,0,0.8);
+            min-height: 100vh;
             position: relative;
+            overflow-x: hidden;
         }
 
-        #sync-status {
-            position: absolute; top: 15px; right: 20px;
-            font-size: 12px; color: var(--brass);
-            display: flex; align-items: center; gap: 8px;
-        }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
-        .dot-online { background: #0f0; box-shadow: 0 0 5px #0f0; }
-        .dot-syncing { background: #ff0; box-shadow: 0 0 5px #ff0; animation: blink 1s infinite; }
-
-        @keyframes blink { 50% { opacity: 0.3; } }
-
-        h1 {
-            text-align: center; text-transform: uppercase; letter-spacing: 12px;
-            color: var(--brass); text-shadow: 3px 3px 6px #000;
-            border-bottom: 2px solid var(--copper); padding-bottom: 15px;
-            margin-top: 10px;
+        #特效层 {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; pointer-events: none; overflow: hidden;
         }
 
-        .toolbar {
-            display: flex; gap: 10px; margin-bottom: 25px;
-            justify-content: center; flex-wrap: wrap;
-            background: rgba(0,0,0,0.4); padding: 15px; border-radius: 4px;
-            border: 1px solid rgba(184, 115, 51, 0.2);
-            position: sticky; top: 0; z-index: 100;
+        /* 改为火花样式 */
+        .奥术尘埃 {
+            position: absolute;
+            background: #ffcc00;
+            border-radius: 2px; /* 方形火花 */
+            box-shadow: 0 0 6px #ff4500;
         }
 
-        button {
-            background: linear-gradient(180deg, #8b5a2b, #4a2e15);
-            color: var(--parchment); border: 1px solid var(--brass);
-            padding: 8px 16px; cursor: pointer; font-family: inherit;
-            box-shadow: 2px 2px 0px #000; transition: 0.2s;
-            text-transform: uppercase; font-size: 13px;
+        .档案容器 {
+            width: 100%; max-width: 1250px;
+            background-color: var(--pf-纸张);
+            /* 油渍与烟熏效果 */
+            background-image: linear-gradient(to bottom, rgba(255,255,255,0.1), rgba(0,0,0,0.1)), url('https://www.transparenttextures.com/patterns/aged-paper.png');
+            border: 8px solid var(--pf-边框);
+            border-top: 15px solid var(--pf-边框); /* 顶部像剪贴板夹子 */
+            padding: 30px;
+            position: relative;
+            animation: 呼吸光 5s infinite ease-in-out, 纸张展开 0.8s ease-out;
+            z-index: 1;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 4px solid var(--pf-边框);
+            margin-bottom: 25px; padding-bottom: 15px;
+            transition: border-color 0.5s;
+        }
+        header:hover { border-bottom-color: var(--pf-深红); }
+
+        h1 { 
+            color: var(--pf-文本); font-size: 2.8em; margin: 0; letter-spacing: 0.1em; 
+            text-transform: uppercase;
+            text-shadow: 2px 2px 0px rgba(184, 134, 11, 0.3);
+            font-family: "Impact", "Source Han Serif SC", serif; /* 硬朗风格 */
+        }
+        .副标题 { color: var(--pf-深红); font-size: 1.1em; font-weight: bold; margin-top: 5px; letter-spacing: 0.2em; text-transform: uppercase; }
+
+        #状态栏 { 
+            font-size: 0.85em; color: var(--pf-边框); margin-bottom: 15px; 
+            text-align: center; font-style: italic; height: 1.2em;
+            transition: opacity 0.3s; font-family: "Courier New", monospace;
+        }
+
+        .控制台 { 
+            margin-bottom: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; 
+            position: sticky; top: 0; z-index: 100; background: inherit; padding: 10px 0;
+            backdrop-filter: blur(2px); align-items: center; border-bottom: 1px dashed var(--pf-古金);
+        }
+
+        .按钮 {
+            background: #3e2723; /* 深棕色皮革感 */
+            color: #d7ccc8; 
+            border: 2px solid var(--pf-古金);
+            padding: 8px 16px; cursor: pointer; font-weight: bold; 
             display: flex; align-items: center; gap: 5px;
+            transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            font-family: "Courier New", sans-serif;
+            text-transform: uppercase;
+        }
+        .按钮:hover { 
+            background: var(--pf-古金); color: #000; 
+            border-color: #000;
+            transform: translateY(-2px); box-shadow: 0 5px 10px rgba(0,0,0,0.6);
+        }
+        .按钮:active { transform: translateY(0); box-shadow: 0 2px 3px rgba(0,0,0,0.3); }
+
+        .同步按钮 { background: #1b3320; border-color: #2e7d32; } /* 类似废土毒液绿 */
+        .同步按钮:hover { background: #2e7d32; color: white; }
+        
+        /* 未保存警告样式 - 锅炉过热 */
+        .按钮-未保存 {
+            background: #8b0000 !important;
+            border-color: var(--pf-警告红) !important;
+            color: #fff !important;
+            animation: 紧急呼吸 1s infinite ease-in-out !important;
+        }
+        
+        .按钮-模式 { background: #1a1a1a; border-color: #444; color: #888; }
+        body.编辑模式 .按钮-模式 { background: var(--pf-古金); border-color: #000; color: #000; }
+
+        .分隔符 { width: 2px; height: 30px; background: var(--pf-边框); margin: 0 5px; opacity: 0.3; }
+
+        .管理员组 { display: none; gap: 10px; align-items: center; }
+        body.编辑模式 .管理员组 { display: flex; }
+
+        .表格包装层 { overflow-x: auto; border: 2px solid var(--pf-边框); box-shadow: inset 0 0 20px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; background-color: rgba(255,255,255,0.1); }
+        
+        thead { background-color: var(--pf-边框); color: var(--pf-古金); }
+        th { padding: 12px; text-align: left; border: 1px solid #444; font-size: 0.9em; letter-spacing: 1px; }
+        
+        td { 
+            padding: 10px; border: 1px solid #9e8c76; vertical-align: middle; font-size: 0.9em; 
+            color: #2c241e;
+            transition: background-color 0.3s;
         }
 
-        button:hover { filter: brightness(1.2); transform: translateY(-1px); }
-        button:active { transform: translateY(1px); box-shadow: 0px 0px 0px #000; }
+        tr:nth-child(even) { background-color: rgba(0,0,0,0.03); }
+        tr:hover td { background-color: rgba(205, 127, 50, 0.1); }
+        .行进入 { animation: 纸张展开 0.5s ease-out backwards; }
 
-        .btn-cloud-save { background: linear-gradient(180deg, #2a4d50, #142628); border-color: #4da6ff; }
-        .btn-cloud-pull { background: linear-gradient(180deg, #3d3d3d, #1a1a1a); border-color: #888; }
-        .btn-unlock { background: linear-gradient(180deg, #6b4a2b, #332211); }
-
-        .npc-table { width: 100%; border-radius: 5px; overflow: hidden; }
-        .npc-row {
-            display: grid;
-            grid-template-columns: 110px 160px 180px 1fr 140px;
-            padding: 15px 10px; border-bottom: 1px solid rgba(184, 115, 51, 0.2);
-            align-items: center; gap: 15px; background: rgba(255,255,255,0.02);
+        .立绘框 { 
+            width: 65px; height: 80px; 
+            border: 2px solid var(--pf-边框); 
+            outline: 1px solid var(--pf-古金);
+            outline-offset: -4px;
+            overflow: hidden; cursor: zoom-in; margin: 0 auto; 
+            position: relative; background: #111;
+            transition: transform 0.3s, box-shadow 0.3s;
+            filter: sepia(0.2); /* 微微的旧照片感 */
         }
-        .header-row {
-            font-weight: bold; color: var(--brass);
-            background: rgba(184, 115, 51, 0.15); border-bottom: 2px solid var(--copper);
-        }
-
-        .portrait-container { text-align: center; }
-        .portrait-box {
-            width: 100px; height: 130px; border: 2px solid var(--copper);
-            background: #000; position: relative; overflow: hidden;
-            cursor: zoom-in; margin-bottom: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-        }
-        .portrait-img { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
-        .portrait-img:hover { transform: scale(1.1); }
-        .upload-indicator {
-            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); color: var(--brass); font-size: 11px;
-            line-height: 130px; text-align: center;
+        .立绘框:hover { transform: scale(1.05); box-shadow: 0 4px 8px rgba(0,0,0,0.6); filter: sepia(0); z-index: 10; }
+        .立绘框 img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
+        .立绘框:hover img { transform: scale(1.1); }
+        
+        .姓名格 { font-weight: bold; color: #6d2416; font-family: "Impact", sans-serif; letter-spacing: 0.5px; }
+        
+        body.编辑模式 [contenteditable="true"]:hover { background: rgba(0,0,0,0.05); cursor: text; }
+        body.编辑模式 [contenteditable="true"]:focus { 
+            background: #fff; outline: none;
+            box-shadow: 0 0 0 2px var(--pf-古金); color: #000;
         }
 
-        input, textarea {
-            background: rgba(0,0,0,0.5); border: 1px solid #5d3a1a;
-            color: #fff; padding: 10px; width: 100%; box-sizing: border-box;
-            font-family: inherit; font-size: 14px;
+        .管理列 { display: none; }
+        body.编辑模式 .管理列 { display: table-cell; }
+
+        .管理格 { display: flex; flex-direction: column; gap: 5px; align-items: center; }
+        .操作组 { display: flex; gap: 5px; width: 100%; justify-content: center; }
+
+        .排序控件 { display: flex; gap: 3px; }
+        .小方钮 { 
+            padding: 2px 6px; cursor: pointer; background: #5d4037; 
+            color: white; border: 1px solid #3e2723; font-size: 10px; transition: 0.2s;
         }
-        textarea { height: 100px; resize: vertical; line-height: 1.4; }
-        input:focus, textarea:focus { border-color: var(--brass); outline: none; background: rgba(184,115,51,0.1); }
+        .小方钮:hover { background: var(--pf-古金); color: black; }
 
-        .sort-controls { display: flex; gap: 4px; opacity: 0.2; pointer-events: none; transition: 0.4s; }
-        .sort-unlocked { opacity: 1; pointer-events: auto; }
-
-        #modal {
+        .弹窗遮罩 {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.9); z-index: 2000; justify-content: center; align-items: center;
+            backdrop-filter: blur(3px); transition: opacity 0.3s;
         }
-        #modal img { max-width: 90%; max-height: 90%; border: 4px solid var(--brass); box-shadow: 0 0 50px rgba(212, 175, 55, 0.3); }
 
+        .上传面板 {
+            background: var(--pf-纸张); border: 4px double var(--pf-边框);
+            padding: 30px; width: 400px; text-align: center;
+            box-shadow: 0 0 50px rgba(0,0,0,1);
+            animation: 弹窗进入 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .上传面板 h3 { color: var(--pf-边框); margin-top: 0; font-family: "Impact", sans-serif; }
+        .上传区域 {
+            border: 2px dashed var(--pf-边框); padding: 20px; margin: 15px 0;
+            color: var(--pf-边框); font-size: 0.9em; background: rgba(0,0,0,0.05);
+            transition: background 0.3s;
+        }
+        .上传区域:hover { background: rgba(255,255,255,0.5); }
+
+        .网址输入 {
+            width: 90%; padding: 8px; background: #f0f0f0; border: 1px solid #888;
+            color: #333; margin-bottom: 10px; font-family: inherit; transition: box-shadow 0.3s;
+        }
+        .网址输入:focus { box-shadow: 0 0 8px var(--pf-古金); outline: none; }
+
+        #放大预览 { cursor: zoom-out; }
+        #放大预览 img { 
+            max-width: 85%; max-height: 85%; border: 4px solid var(--pf-古金); 
+            box-shadow: 0 0 50px #000; animation: 弹窗进入 0.3s ease-out;
+        }
+
+        .瑟希隆符号 { 
+            text-align: center; margin-top: 30px; color: var(--pf-古金); 
+            font-size: 1.5em; opacity: 0.6; letter-spacing: 15px; transition: opacity 0.5s;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        .瑟希隆符号:hover { opacity: 1; text-shadow: 0 0 10px var(--pf-古金); transform: rotate(1deg); }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <div id="sync-status">
-            <div class="status-dot" id="dot"></div> 
-            <span id="sync-text">读取中...</span>
-        </div>
+    <div id="特效层"></div>
 
-        <h1>霾 都 狂 徒</h1>
+    <div class="档案容器">
+        <header>
+            <h1>霾都狂徒</h1>
+            <div class="副标题">阿肯斯塔通缉要犯与线人</div>
+        </header>
 
-        <div class="toolbar">
-            <button onclick="addNPC()">+ 添加新调查对象</button>
-            <button class="btn-unlock" id="lock-btn" onclick="toggleSortLock()">🔓 激活排序</button>
-            <button class="btn-cloud-pull" onclick="pullFromCloudManual()">🔄 拉取云端</button>
-            <button class="btn-cloud-save" onclick="saveToCloud()">💾 保存修改至云端</button>
-            <button onclick="exportData()">⚙ 导出 JSON</button>
-            <button onclick="triggerImport()">⚓ 导入档案</button>
-            <input type="file" id="import-input" style="display:none" accept=".json" onchange="handleImport(event)">
-        </div>
+        <div id="状态栏">齿轮运转正常，法力废墟读数稳定。</div>
 
-        <div class="npc-table" id="npc-list">
-            <div class="npc-row header-row">
-                <div>调查立绘</div>
-                <div>姓名</div>
-                <div>身份/职位</div>
-                <div>调查线索与笔记</div>
-                <div>档案管理</div>
+        <div class="控制台">
+            <!-- 所有人可见 -->
+            <button class="按钮 按钮-模式" onclick="切换模式()" id="模式按钮">✎ 编辑模式</button>
+            <button class="按钮" onclick="加载数据()">🔄 刷新情报</button>
+            <button class="按钮" style="background:#3e2723" onclick="导出备份()">导出胶卷</button>
+
+            <!-- 仅编辑模式可见 -->
+            <div class="管理员组">
+                <div class="分隔符"></div>
+                <button class="按钮" onclick="添加行()">+ 新增档案</button>
+                <button class="按钮 同步按钮" id="保存按钮" onclick="保存到云端()">● 刻录至机枢 (同步)</button>
+                <button class="按钮" style="background:#3e2723" onclick="触发导入()">导入</button>
             </div>
-            <!-- 内容动态渲染 -->
+            
+            <input type="file" id="导入框" style="display:none" accept=".json" onchange="导入备份(event)">
         </div>
-        <div id="anchor-bottom"></div>
+
+        <div class="表格包装层">
+            <table>
+                <thead>
+                    <tr>
+                        <th width="80">影像</th>
+                        <th width="150">代号/姓名</th>
+                        <th width="160">身份/职业</th>
+                        <th width="200">动机/悬赏</th>
+                        <th>情报记录</th>
+                        <th width="120" class="管理列">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="表格主体"></tbody>
+            </table>
+        </div>
+        <div id="页尾锚点"></div>
+        <div class="瑟希隆符号">⚙ ⚙ ⚙ ⚙ ⚙</div>
     </div>
 
-    <div id="modal" onclick="this.style.display='none'"><img id="modal-img"></div>
-    <input type="file" id="img-input" style="display:none" accept="image/*">
+    <div id="放大预览" class="弹窗遮罩" onclick="this.style.display='none'">
+        <img id="预览图" src="">
+    </div>
+
+    <div id="更图弹窗" class="弹窗遮罩">
+        <div class="上传面板">
+            <h3>更新通缉令影像</h3>
+            <p style="font-size: 0.8em; color: #5d4037;">直接粘贴(Ctrl+V)照片<br>或使用下方选项</p>
+            <div class="上传区域">
+                <button class="按钮" style="font-size: 0.8em; margin: 0 auto;" onclick="document.getElementById('隐藏上传').click()">选择本地胶卷</button>
+            </div>
+            <input type="text" id="网址输入框" class="网址输入" placeholder="或在此输入影像链接...">
+            <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: center;">
+                <button class="按钮" onclick="确定网址()">确定</button>
+                <button class="按钮" style="border-color:#555; background:#666;" onclick="关闭更图弹窗()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="隐藏上传" style="display:none" accept="image/*">
 
     <script>
-        const IMG_BB_KEY = "192ec7a9ecdec9b51ffed683da3842dc";
-        const BIN_ID = "69474b2143b1c97be9fbf27e";
-        const JSONBIN_KEY = "$2a$10$HCO6T/SodpbU9GwiCzOV2uvw75u5tfxjQ5vdK3rvhmJiWdFsUxqTu";
-        const SECRET = "781674";
+        // === 配置修改区域 ===
+        const BIN_ID = '69474b2143b1c97be9fbf27e';
+        const API_KEY = '$2a$10$HCO6T/SodpbU9GwiCzOV2uvw75u5tfxjQ5vdK3rvhmJiWdFsUxqTu';
+        const IMG_BB_KEY = '192ec7a9ecdec9b51ffed683da3842dc';
+        const 密码 = '781674';
 
-        let npcs = [];
-        let isSortUnlocked = false;
+        let 内存数据 = [];
+        let 当前编辑索引 = -1;
+        let 是否编辑模式 = false; 
+        let 有未保存变更 = false;
 
-        window.onload = async () => {
-            const localData = localStorage.getItem('alkenstar_pro_v4');
-            if (localData) {
-                npcs = JSON.parse(localData);
-                render();
-            }
-            await syncFromCloud(false);
+        window.onload = function() {
+            加载数据();
+            初始化奥术尘埃();
         };
 
-        // --- 云端逻辑 ---
+        // --- 核心状态控制 ---
 
-        async function syncFromCloud(isManual = false) {
-            setSyncStatus('syncing', '正在连接发条中心...');
-            try {
-                const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-                    headers: { 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Meta': false }
-                });
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    npcs = data;
-                    render();
-                    saveLocal();
-                    setSyncStatus('online', '云端已同步');
-                    if(isManual) alert("同步成功！");
-                }
-            } catch (err) {
-                setSyncStatus('offline', '连接失败 (本地模式)');
-            }
-        }
-
-        async function pullFromCloudManual() {
-            if(confirm("确定拉取云端数据？本地未保存的修改将被覆盖。")) {
-                await syncFromCloud(true);
-            }
-        }
-
-        async function saveToCloud() {
-            if (prompt("授权码:") !== SECRET) { alert("密码错误！"); return; }
-
-            setSyncStatus('syncing', '上传中...');
-            try {
-                const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
-                    body: JSON.stringify(npcs)
-                });
-                if (res.ok) {
-                    setSyncStatus('online', '云端更新完毕');
-                    alert("同步成功！");
-                }
-            } catch (err) { alert("保存失败"); }
-        }
-
-        // --- 核心操作 ---
-
-        function addNPC() {
-            const newNpc = {
-                id: Date.now(),
-                name: "新调查对象",
-                position: "待定",
-                portrait: "https://via.placeholder.com/150x200?text=NO+DATA",
-                notes: ""
-            };
-            // --- 修正点：由 unshift 修改为 push ---
-            npcs.push(newNpc); 
-            render();
-            saveLocal();
-            
-            // 自动滚动到页面底部
-            setTimeout(() => {
-                document.getElementById('anchor-bottom').scrollIntoView({ behavior: 'smooth' });
-            }, 100);
-        }
-
-        function toggleSortLock() {
-            if (!isSortUnlocked) {
-                if (prompt("授权码:") === SECRET) {
-                    isSortUnlocked = true;
-                    document.getElementById('lock-btn').innerHTML = "🔒 锁定排序";
-                    render();
+        function 切换模式() {
+            if (!是否编辑模式) {
+                const p = prompt("请输入大公国密令以解锁档案:");
+                if (p === 密码) {
+                    是否编辑模式 = true;
+                    document.body.classList.add('编辑模式');
+                    document.getElementById('模式按钮').innerHTML = "👁 观察模式";
+                    更新状态("权限验证通过。");
+                    渲染表格();
+                } else {
+                    alert("密令错误！警报已触发。");
                 }
             } else {
-                isSortUnlocked = false;
-                document.getElementById('lock-btn').innerHTML = "🔓 激活排序";
-                render();
+                if (有未保存变更) {
+                    if(!confirm("情报尚未刻录，退出将导致数据丢失，确定退出吗？")) return;
+                }
+                是否编辑模式 = false;
+                document.body.classList.remove('编辑模式');
+                document.getElementById('模式按钮').innerHTML = "✎ 编辑模式";
+                更新状态("回归观察者视角。");
+                渲染表格();
             }
         }
 
-        async function triggerUpload(id) {
-            const input = document.getElementById('img-input');
-            input.onchange = async (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                document.getElementById(`up-${id}`).style.display = 'block';
-                const formData = new FormData();
-                formData.append("image", file);
-                try {
-                    const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMG_BB_KEY}`, {
-                        method: "POST", body: formData
-                    });
-                    const result = await res.json();
-                    if (result.success) {
-                        const npc = npcs.find(n => n.id === id);
-                        npc.portrait = result.data.url;
-                        render(); saveLocal();
+        function 设置未保存状态(状态) {
+            有未保存变更 = 状态;
+            const btn = document.getElementById('保存按钮');
+            if (状态) {
+                btn.classList.add('按钮-未保存');
+                btn.innerHTML = "⚠ 变更未刻录";
+                document.title = "* 未保存 - 霾都狂徒档案";
+                saveLocal(); 
+            } else {
+                btn.classList.remove('按钮-未保存');
+                btn.innerHTML = "● 刻录至机枢 (同步)";
+                document.title = "霾都狂徒 - 废土档案库";
+            }
+        }
+
+        window.onbeforeunload = function(e) {
+            if (有未保存变更) {
+                e.preventDefault();
+                e.returnValue = '';
+                return '侦测到未保存的数据波动，确定要离开吗？';
+            }
+        };
+
+        // --- 数据逻辑 ---
+
+        async function 加载数据() {
+            更新状态("正在接入发条数据塔...");
+            try {
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { 'X-Master-Key': API_KEY, 'X-Bin-Meta': false }
+                });
+                const data = await res.json();
+                内存数据 = Array.isArray(data) ? data : (data.record || []);
+                渲染表格();
+                设置未保存状态(false);
+                更新状态("档案已更新。愿布莱igh指引你的发明。");
+            } catch (e) {
+                更新状态("连接被静电风暴阻断，请检查网络。");
+            }
+        }
+
+        function 渲染表格() {
+            const tbody = document.getElementById("表格主体");
+            tbody.innerHTML = '';
+            
+            const editableAttr = 是否编辑模式 ? 'contenteditable="true"' : '';
+
+            内存数据.forEach((npc, index) => {
+                const tr = document.createElement('tr');
+                tr.className = '行进入';
+                tr.style.animationDelay = `${index * 0.05}s`;
+                
+                let html = `
+                    <td>
+                        <div class="立绘框" onclick="预览图片('${npc.立绘}')">
+                            <img src="${npc.立绘}" class="人物图">
+                        </div>
+                    </td>
+                    <td ${editableAttr} onblur="同步内存(${index}, '姓名', this.innerText)" class="姓名格">${npc.姓名}</td>
+                    <td ${editableAttr} onblur="同步内存(${index}, '职位', this.innerText)">${npc.职位}</td>
+                    <td ${editableAttr} onblur="同步内存(${index}, '动机', this.innerText)">${npc.动机}</td>
+                    <td ${editableAttr} onblur="同步内存(${index}, '备注', this.innerText)">${npc.备注}</td>
+                `;
+
+                html += `
+                    <td class="管理列">
+                        <div class="管理格">
+                            <div class="排序控件">
+                                <button class="小方钮" onclick="移动位次(${index}, -1)">▲</button>
+                                <button class="小方钮" onclick="移动位次(${index}, 1)">▼</button>
+                            </div>
+                            <div class="操作组">
+                                <button class="按钮" style="padding:2px 6px; font-size:11px; flex:1;" onclick="打开更图弹窗(${index})">更图</button>
+                                <button class="按钮" style="padding:2px 6px; font-size:11px; background:#444; flex:1;" onclick="删除NPC(${index})">抹除</button>
+                            </div>
+                        </div>
+                    </td>
+                `;
+
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function 同步内存(idx, key, val) {
+            const cleanVal = val.trim();
+            if (内存数据[idx][key] !== cleanVal) {
+                内存数据[idx][key] = cleanVal;
+                设置未保存状态(true);
+            }
+        }
+
+        function 添加行() {
+            内存数据.push({ 
+                立绘: 'https://via.placeholder.com/65x80/2f2f2f/cd7f32?text=?', 
+                姓名: '未知目标', 职位: '不明', 动机: '待查', 备注: '输入情报...' 
+            });
+            渲染表格();
+            设置未保存状态(true);
+            setTimeout(() => document.getElementById('页尾锚点').scrollIntoView({ behavior: 'smooth' }), 100);
+        }
+
+        // 修改：增加密码验证
+        function 删除NPC(idx) {
+            // 第一步：防止误触
+            if (!confirm(`确定要从档案中永久抹除「${内存数据[idx].姓名}」吗？此操作不可撤销。`)) return;
+
+            // 第二步：密码验证
+            const p = prompt("请输入大公国密令以确认销毁档案:");
+            if (p === 密码) {
+                内存数据.splice(idx, 1);
+                渲染表格();
+                设置未保存状态(true);
+                更新状态("档案已销毁。");
+            } else {
+                alert("密令错误！操作已取消。");
+            }
+        }
+
+        function 移动位次(index, step) {
+            const newIndex = index + step;
+            if (newIndex >= 0 && newIndex < 内存数据.length) {
+                const temp = 内存数据[index];
+                内存数据[index] = 内存数据[newIndex];
+                内存数据[newIndex] = temp;
+                渲染表格();
+                设置未保存状态(true);
+            }
+        }
+
+        async function 保存到云端() {
+            const p = prompt("确认要刻录数据吗？(输入密令):");
+            if (p !== 密码) { alert("密令错误。"); return; }
+
+            更新状态("正在向机枢上传卷筒...");
+            try {
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+                    body: JSON.stringify(内存数据)
+                });
+                设置未保存状态(false);
+                更新状态("刻录成功！档案已安全存储。");
+            } catch (e) {
+                更新状态("上传失败。");
+                alert("云端同步失败，请检查机枢连接。");
+            }
+        }
+
+        // --- 图片处理 ---
+
+        function 打开更图弹窗(index) {
+            当前编辑索引 = index;
+            document.getElementById('更图弹窗').style.display = 'flex';
+            document.getElementById('网址输入框').value = '';
+        }
+
+        function 关闭更图弹窗() {
+            document.getElementById('更图弹窗').style.display = 'none';
+        }
+
+        async function 执行上传(file) {
+            if (!file) return;
+            更新状态("正在显影照片...");
+            关闭更图弹窗();
+            const formData = new FormData();
+            formData.append("image", file);
+            try {
+                const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMG_BB_KEY}`, {
+                    method: "POST", body: formData
+                });
+                const result = await res.json();
+                if (result.success) {
+                    内存数据[当前编辑索引].立绘 = result.data.url;
+                    渲染表格();
+                    设置未保存状态(true);
+                    更新状态("影像更替成功。");
+                }
+            } catch (err) { alert("显影失败，请检查药水(网络)。"); }
+        }
+
+        function 确定网址() {
+            const url = document.getElementById('网址输入框').value.trim();
+            if (url) {
+                内存数据[当前编辑索引].立绘 = url;
+                渲染表格();
+                设置未保存状态(true);
+                关闭更图弹窗();
+                更新状态("已链接外部影像。");
+            }
+        }
+
+        document.getElementById('隐藏上传').onchange = (e) => {
+            执行上传(e.target.files[0]);
+        };
+
+        // --- 杂项与特效 ---
+
+        function 初始化奥术尘埃() {
+            const 容器 = document.getElementById('特效层');
+            // 减少粒子数量，模拟火花
+            for (let i = 0; i < 25; i++) {
+                创建粒子(容器);
+            }
+        }
+
+        function 创建粒子(容器) {
+            const 粒子 = document.createElement('div');
+            粒子.classList.add('奥术尘埃');
+            const size = Math.random() * 4 + 1; // 火花稍大一点
+            粒子.style.width = `${size}px`; 粒子.style.height = `${size}px`;
+            粒子.style.left = `${Math.random() * 100}%`;
+            const duration = Math.random() * 5 + 3; // 速度更快
+            const delay = Math.random() * 5;
+            粒子.style.animation = `尘埃漂浮 ${duration}s linear ${delay}s infinite`;
+            容器.appendChild(粒子);
+        }
+
+        document.addEventListener('paste', function(e) {
+            if (document.getElementById('更图弹窗').style.display === 'flex') {
+                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (let item of items) {
+                    if (item.type.indexOf("image") !== -1) {
+                        执行上传(item.getAsFile());
                     }
-                } catch (err) { alert("失败"); }
-                document.getElementById(`up-${id}`).style.display = 'none';
-            };
-            input.click();
-        }
-
-        // --- 基础工具 ---
-
-        function updateField(id, field, value) {
-            const npc = npcs.find(n => n.id === id);
-            if (npc) { npc[field] = value; saveLocal(); }
-        }
-
-        function move(index, dir) {
-            const target = dir === 'up' ? index - 1 : index + 1;
-            if (target >= 0 && target < npcs.length) {
-                [npcs[index], npcs[target]] = [npcs[target], npcs[index]];
-                render(); saveLocal();
+                }
             }
-        }
-
-        function deleteNPC(id) {
-            if (confirm("确定销毁档案？")) {
-                npcs = npcs.filter(n => n.id !== id);
-                render(); saveLocal();
+            if (e.target.getAttribute('contenteditable')) {
+                e.preventDefault();
+                const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+                document.execCommand('insertText', false, text);
             }
+        });
+
+        function saveLocal() {
+            localStorage.setItem('pf_rotr_local', JSON.stringify(内存数据));
         }
 
-        function zoom(src) {
-            const m = document.getElementById('modal');
-            document.getElementById('modal-img').src = src;
-            m.style.display = 'flex';
-        }
-
-        function saveLocal() { localStorage.setItem('alkenstar_pro_v4', JSON.stringify(npcs)); }
-
-        function triggerImport() {
-            if (prompt("密码:") === SECRET) document.getElementById('import-input').click();
-        }
-
-        function handleImport(event) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                npcs = JSON.parse(e.target.result);
-                render(); saveLocal();
-            };
-            reader.readAsText(event.target.files[0]);
-        }
-
-        function exportData() {
-            const blob = new Blob([JSON.stringify(npcs, null, 2)], {type: "application/json"});
-            const url = URL.createObjectURL(blob);
+        function 导出备份() {
+            const blob = new Blob([JSON.stringify(内存数据, null, 2)], { type: 'application/json' });
             const a = document.createElement('a');
-            a.href = url; a.download = `Archive_${Date.now()}.json`;
+            a.href = URL.createObjectURL(blob);
+            a.download = `霾都档案备份_${new Date().toLocaleDateString()}.json`;
             a.click();
         }
 
-        function setSyncStatus(type, text) {
-            const dot = document.getElementById('dot');
-            const txt = document.getElementById('sync-text');
-            dot.className = 'status-dot';
-            if (type === 'online') dot.classList.add('dot-online');
-            if (type === 'syncing') dot.classList.add('dot-syncing');
-            txt.innerText = text;
+        function 触发导入() { document.getElementById("导入框").click(); }
+
+        function 导入备份(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                内存数据 = JSON.parse(ev.target.result);
+                渲染表格();
+                设置未保存状态(true);
+                更新状态("旧日档案已载入，点击刻录生效。");
+            };
+            reader.readAsText(file);
         }
 
-        function render() {
-            const list = document.getElementById('npc-list');
-            const header = list.querySelector('.header-row').outerHTML;
-            let html = header;
+        function 预览图片(s) {
+            document.getElementById("预览图").src = s;
+            document.getElementById("放大预览").style.display = 'flex';
+        }
 
-            npcs.forEach((npc, index) => {
-                html += `
-                    <div class="npc-row">
-                        <div class="portrait-container">
-                            <div class="portrait-box" onclick="zoom('${npc.portrait}')">
-                                <img src="${npc.portrait}" class="portrait-img">
-                                <div class="upload-indicator" id="up-${npc.id}">传输中...</div>
-                            </div>
-                            <button style="font-size:9px; width:100px; padding:2px" onclick="triggerUpload(${npc.id})">📸 更换立绘</button>
-                        </div>
-                        <div><input type="text" value="${npc.name}" onchange="updateField(${npc.id}, 'name', this.value)"></div>
-                        <div><input type="text" value="${npc.position}" onchange="updateField(${npc.id}, 'position', this.value)"></div>
-                        <div><textarea onchange="updateField(${npc.id}, 'notes', this.value)">${npc.notes}</textarea></div>
-                        <div class="actions">
-                            <div class="sort-controls ${isSortUnlocked ? 'sort-unlocked' : ''}">
-                                <button onclick="move(${index}, 'up')">▲</button>
-                                <button onclick="move(${index}, 'down')">▼</button>
-                            </div>
-                            <button class="btn-unlock" style="background:#555; font-size:10px; margin-top:8px" onclick="deleteNPC(${npc.id})">⚠ 销毁档案</button>
-                        </div>
-                    </div>
-                `;
-            });
-            list.innerHTML = html;
+        function 更新状态(s) { 
+            const el = document.getElementById("状态栏");
+            el.style.opacity = 0;
+            setTimeout(() => { el.innerText = s; el.style.opacity = 1; }, 200);
         }
     </script>
 </body>
