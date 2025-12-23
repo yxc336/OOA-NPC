@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>霾都狂徒 - 调查员档案管理</title>
+    <style>
+        :root {
+            --copper: #b87333;
+            --brass: #d4af37;
+            --iron: #3d3d3d;
+            --parchment: #f4e4bc;
+            --dark-paper: #1a1510;
+            --danger: #7c2222;
+            --success: #2a4d50;
+        }
+
+        body {
+            background-color: #0b0b0b;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(44, 30, 20, 0.8) 0%, #0b0b0b 100%),
+                url("https://www.transparenttextures.com/patterns/carbon-fibre.png");
+            color: var(--parchment);
+            font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+        }
+
+        .container {
+            width: 95%; max-width: 1200px;
+            border: 6px double var(--copper);
+            background: var(--dark-paper);
+            padding: 30px;
+            box-shadow: 0 0 50px rgba(0,0,0,1), inset 0 0 100px rgba(0,0,0,0.8);
+            position: relative;
+        }
+
+        #sync-status {
+            position: absolute; top: 15px; right: 20px;
+            font-size: 12px; color: var(--brass);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
+        .dot-online { background: #0f0; box-shadow: 0 0 5px #0f0; }
+        .dot-syncing { background: #ff0; box-shadow: 0 0 5px #ff0; animation: blink 1s infinite; }
+
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        h1 {
+            text-align: center; text-transform: uppercase; letter-spacing: 12px;
+            color: var(--brass); text-shadow: 3px 3px 6px #000;
+            border-bottom: 2px solid var(--copper); padding-bottom: 15px;
+            margin-top: 10px;
+        }
+
+        .toolbar {
+            display: flex; gap: 10px; margin-bottom: 25px;
+            justify-content: center; flex-wrap: wrap;
+            background: rgba(0,0,0,0.4); padding: 15px; border-radius: 4px;
+            border: 1px solid rgba(184, 115, 51, 0.2);
+            position: sticky; top: 0; z-index: 100;
+        }
+
+        button {
+            background: linear-gradient(180deg, #8b5a2b, #4a2e15);
+            color: var(--parchment); border: 1px solid var(--brass);
+            padding: 8px 16px; cursor: pointer; font-family: inherit;
+            box-shadow: 2px 2px 0px #000; transition: 0.2s;
+            text-transform: uppercase; font-size: 13px;
+            display: flex; align-items: center; gap: 5px;
+        }
+
+        button:hover { filter: brightness(1.2); transform: translateY(-1px); }
+        button:active { transform: translateY(1px); box-shadow: 0px 0px 0px #000; }
+
+        .btn-cloud-save { background: linear-gradient(180deg, #2a4d50, #142628); border-color: #4da6ff; }
+        .btn-cloud-pull { background: linear-gradient(180deg, #3d3d3d, #1a1a1a); border-color: #888; }
+        .btn-unlock { background: linear-gradient(180deg, #6b4a2b, #332211); }
+
+        .npc-table { width: 100%; border-radius: 5px; overflow: hidden; }
+        .npc-row {
+            display: grid;
+            grid-template-columns: 110px 160px 180px 1fr 140px;
+            padding: 15px 10px; border-bottom: 1px solid rgba(184, 115, 51, 0.2);
+            align-items: center; gap: 15px; background: rgba(255,255,255,0.02);
+        }
+        .header-row {
+            font-weight: bold; color: var(--brass);
+            background: rgba(184, 115, 51, 0.15); border-bottom: 2px solid var(--copper);
+        }
+
+        .portrait-container { text-align: center; }
+        .portrait-box {
+            width: 100px; height: 130px; border: 2px solid var(--copper);
+            background: #000; position: relative; overflow: hidden;
+            cursor: zoom-in; margin-bottom: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        }
+        .portrait-img { width: 100%; height: 100%; object-fit: cover; transition: 0.3s; }
+        .portrait-img:hover { transform: scale(1.1); }
+        .upload-indicator {
+            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); color: var(--brass); font-size: 11px;
+            line-height: 130px; text-align: center;
+        }
+
+        input, textarea {
+            background: rgba(0,0,0,0.5); border: 1px solid #5d3a1a;
+            color: #fff; padding: 10px; width: 100%; box-sizing: border-box;
+            font-family: inherit; font-size: 14px;
+        }
+        textarea { height: 100px; resize: vertical; line-height: 1.4; }
+        input:focus, textarea:focus { border-color: var(--brass); outline: none; background: rgba(184,115,51,0.1); }
+
+        .sort-controls { display: flex; gap: 4px; opacity: 0.2; pointer-events: none; transition: 0.4s; }
+        .sort-unlocked { opacity: 1; pointer-events: auto; }
+
+        #modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; align-items: center;
+        }
+        #modal img { max-width: 90%; max-height: 90%; border: 4px solid var(--brass); box-shadow: 0 0 50px rgba(212, 175, 55, 0.3); }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="sync-status">
+            <div class="status-dot" id="dot"></div> 
+            <span id="sync-text">读取中...</span>
+        </div>
+
+        <h1>霾 都 狂 徒</h1>
+
+        <div class="toolbar">
+            <button onclick="addNPC()">+ 添加新调查对象</button>
+            <button class="btn-unlock" id="lock-btn" onclick="toggleSortLock()">🔓 激活排序</button>
+            <button class="btn-cloud-pull" onclick="pullFromCloudManual()">🔄 拉取云端</button>
+            <button class="btn-cloud-save" onclick="saveToCloud()">💾 保存修改至云端</button>
+            <button onclick="exportData()">⚙ 导出 JSON</button>
+            <button onclick="triggerImport()">⚓ 导入档案</button>
+            <input type="file" id="import-input" style="display:none" accept=".json" onchange="handleImport(event)">
+        </div>
+
+        <div class="npc-table" id="npc-list">
+            <div class="npc-row header-row">
+                <div>调查立绘</div>
+                <div>姓名</div>
+                <div>身份/职位</div>
+                <div>调查线索与笔记</div>
+                <div>档案管理</div>
+            </div>
+            <!-- 内容动态渲染 -->
+        </div>
+        <div id="anchor-bottom"></div>
+    </div>
+
+    <div id="modal" onclick="this.style.display='none'"><img id="modal-img"></div>
+    <input type="file" id="img-input" style="display:none" accept="image/*">
+
+    <script>
+        const IMG_BB_KEY = "192ec7a9ecdec9b51ffed683da3842dc";
+        const BIN_ID = "69474b2143b1c97be9fbf27e";
+        const JSONBIN_KEY = "$2a$10$HCO6T/SodpbU9GwiCzOV2uvw75u5tfxjQ5vdK3rvhmJiWdFsUxqTu";
+        const SECRET = "YXC233";
+
+        let npcs = [];
+        let isSortUnlocked = false;
+
+        window.onload = async () => {
+            const localData = localStorage.getItem('alkenstar_pro_v4');
+            if (localData) {
+                npcs = JSON.parse(localData);
+                render();
+            }
+            await syncFromCloud(false);
+        };
+
+        // --- 云端逻辑 ---
+
+        async function syncFromCloud(isManual = false) {
+            setSyncStatus('syncing', '正在连接发条中心...');
+            try {
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { 'X-Master-Key': JSONBIN_KEY, 'X-Bin-Meta': false }
+                });
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    npcs = data;
+                    render();
+                    saveLocal();
+                    setSyncStatus('online', '云端已同步');
+                    if(isManual) alert("同步成功！");
+                }
+            } catch (err) {
+                setSyncStatus('offline', '连接失败 (本地模式)');
+            }
+        }
+
+        async function pullFromCloudManual() {
+            if(confirm("确定拉取云端数据？本地未保存的修改将被覆盖。")) {
+                await syncFromCloud(true);
+            }
+        }
+
+        async function saveToCloud() {
+            if (prompt("授权码:") !== SECRET) { alert("密码错误！"); return; }
+
+            setSyncStatus('syncing', '上传中...');
+            try {
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_KEY },
+                    body: JSON.stringify(npcs)
+                });
+                if (res.ok) {
+                    setSyncStatus('online', '云端更新完毕');
+                    alert("同步成功！");
+                }
+            } catch (err) { alert("保存失败"); }
+        }
+
+        // --- 核心操作 ---
+
+        function addNPC() {
+            const newNpc = {
+                id: Date.now(),
+                name: "新调查对象",
+                position: "待定",
+                portrait: "https://via.placeholder.com/150x200?text=NO+DATA",
+                notes: ""
+            };
+            // --- 修正点：由 unshift 修改为 push ---
+            npcs.push(newNpc); 
+            render();
+            saveLocal();
+            
+            // 自动滚动到页面底部
+            setTimeout(() => {
+                document.getElementById('anchor-bottom').scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+
+        function toggleSortLock() {
+            if (!isSortUnlocked) {
+                if (prompt("授权码:") === SECRET) {
+                    isSortUnlocked = true;
+                    document.getElementById('lock-btn').innerHTML = "🔒 锁定排序";
+                    render();
+                }
+            } else {
+                isSortUnlocked = false;
+                document.getElementById('lock-btn').innerHTML = "🔓 激活排序";
+                render();
+            }
+        }
+
+        async function triggerUpload(id) {
+            const input = document.getElementById('img-input');
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                document.getElementById(`up-${id}`).style.display = 'block';
+                const formData = new FormData();
+                formData.append("image", file);
+                try {
+                    const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMG_BB_KEY}`, {
+                        method: "POST", body: formData
+                    });
+                    const result = await res.json();
+                    if (result.success) {
+                        const npc = npcs.find(n => n.id === id);
+                        npc.portrait = result.data.url;
+                        render(); saveLocal();
+                    }
+                } catch (err) { alert("失败"); }
+                document.getElementById(`up-${id}`).style.display = 'none';
+            };
+            input.click();
+        }
+
+        // --- 基础工具 ---
+
+        function updateField(id, field, value) {
+            const npc = npcs.find(n => n.id === id);
+            if (npc) { npc[field] = value; saveLocal(); }
+        }
+
+        function move(index, dir) {
+            const target = dir === 'up' ? index - 1 : index + 1;
+            if (target >= 0 && target < npcs.length) {
+                [npcs[index], npcs[target]] = [npcs[target], npcs[index]];
+                render(); saveLocal();
+            }
+        }
+
+        function deleteNPC(id) {
+            if (confirm("确定销毁档案？")) {
+                npcs = npcs.filter(n => n.id !== id);
+                render(); saveLocal();
+            }
+        }
+
+        function zoom(src) {
+            const m = document.getElementById('modal');
+            document.getElementById('modal-img').src = src;
+            m.style.display = 'flex';
+        }
+
+        function saveLocal() { localStorage.setItem('alkenstar_pro_v4', JSON.stringify(npcs)); }
+
+        function triggerImport() {
+            if (prompt("密码:") === SECRET) document.getElementById('import-input').click();
+        }
+
+        function handleImport(event) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                npcs = JSON.parse(e.target.result);
+                render(); saveLocal();
+            };
+            reader.readAsText(event.target.files[0]);
+        }
+
+        function exportData() {
+            const blob = new Blob([JSON.stringify(npcs, null, 2)], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `Archive_${Date.now()}.json`;
+            a.click();
+        }
+
+        function setSyncStatus(type, text) {
+            const dot = document.getElementById('dot');
+            const txt = document.getElementById('sync-text');
+            dot.className = 'status-dot';
+            if (type === 'online') dot.classList.add('dot-online');
+            if (type === 'syncing') dot.classList.add('dot-syncing');
+            txt.innerText = text;
+        }
+
+        function render() {
+            const list = document.getElementById('npc-list');
+            const header = list.querySelector('.header-row').outerHTML;
+            let html = header;
+
+            npcs.forEach((npc, index) => {
+                html += `
+                    <div class="npc-row">
+                        <div class="portrait-container">
+                            <div class="portrait-box" onclick="zoom('${npc.portrait}')">
+                                <img src="${npc.portrait}" class="portrait-img">
+                                <div class="upload-indicator" id="up-${npc.id}">传输中...</div>
+                            </div>
+                            <button style="font-size:9px; width:100px; padding:2px" onclick="triggerUpload(${npc.id})">📸 更换立绘</button>
+                        </div>
+                        <div><input type="text" value="${npc.name}" onchange="updateField(${npc.id}, 'name', this.value)"></div>
+                        <div><input type="text" value="${npc.position}" onchange="updateField(${npc.id}, 'position', this.value)"></div>
+                        <div><textarea onchange="updateField(${npc.id}, 'notes', this.value)">${npc.notes}</textarea></div>
+                        <div class="actions">
+                            <div class="sort-controls ${isSortUnlocked ? 'sort-unlocked' : ''}">
+                                <button onclick="move(${index}, 'up')">▲</button>
+                                <button onclick="move(${index}, 'down')">▼</button>
+                            </div>
+                            <button class="btn-unlock" style="background:#555; font-size:10px; margin-top:8px" onclick="deleteNPC(${npc.id})">⚠ 销毁档案</button>
+                        </div>
+                    </div>
+                `;
+            });
+            list.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
